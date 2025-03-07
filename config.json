@@ -1,17 +1,22 @@
 {
-  "listen_addr": ":9090",
-  "targets": [
-    {
-      "name": "service1",
-      "url": "http://www.xx.com/",
-      "path_prefix": "/xx"
-    }
-  ],
-  "timeout": {
-    "read_timeout": 30,
-    "write_timeout": 30,
-    "idle_timeout": 60
-  },
-  "max_idle_conns": 100,
-  "enable_logs": true
+    "listen_addr": ":9090",
+    "targets": [
+        {
+            "name": "service1",
+            "url": "",
+            "path_prefix": "/xx"
+        },
+        {
+            "name": "server2",
+            "url": "",
+            "path_prefix": "/zhian"
+        }
+    ],
+    "timeout": {
+        "read_timeout": 30,
+        "write_timeout": 30,
+        "idle_timeout": 60
+    },
+    "max_idle_conns": 100,
+    "enable_logs": true
 }
