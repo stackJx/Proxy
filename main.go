@@ -132,6 +132,16 @@ func newProxyHandler(config *Config) (*ProxyHandler, error) {
 				req.URL.Scheme = localTargetURL.Scheme
 				req.URL.Host = localTargetURL.Host
 				req.Host = localTargetURL.Host
+
+				// 转发前移除路径前缀
+				if strings.HasPrefix(req.URL.Path, target.PathPrefix) {
+					req.URL.Path = strings.TrimPrefix(req.URL.Path, target.PathPrefix)
+					// 确保修剪后的路径以 / 开头
+					if req.URL.Path == "" || req.URL.Path[0] != '/' {
+						req.URL.Path = "/" + req.URL.Path
+					}
+				}
+
 				if handler.enableLogs {
 					log.Printf("[请求转发] 将 URL 从 %s 重写为 %s", originalURL, req.URL.String())
 				}
