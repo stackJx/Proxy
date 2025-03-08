@@ -124,18 +124,24 @@ func newProxyHandler(config *Config) (*ProxyHandler, error) {
 		}
 		// 为闭包创建本地变量
 		localTargetURL := targetURL
+		pathPrefix := target.PathPrefix
 		proxy := &httputil.ReverseProxy{
 			Transport: transport,
 			// Director 用于修改请求，使其指向目标服务器
 			Director: func(req *http.Request) {
 				originalURL := req.URL.String()
+
+				// 保存原路径以便日志记录
+				originalPath := req.URL.Path
+
+				// 设置目标服务器的 scheme 和 host
 				req.URL.Scheme = localTargetURL.Scheme
 				req.URL.Host = localTargetURL.Host
 				req.Host = localTargetURL.Host
 
 				// 转发前移除路径前缀
-				if strings.HasPrefix(req.URL.Path, target.PathPrefix) {
-					req.URL.Path = strings.TrimPrefix(req.URL.Path, target.PathPrefix)
+				if strings.HasPrefix(req.URL.Path, pathPrefix) {
+					req.URL.Path = strings.TrimPrefix(req.URL.Path, pathPrefix)
 					// 确保修剪后的路径以 / 开头
 					if req.URL.Path == "" || req.URL.Path[0] != '/' {
 						req.URL.Path = "/" + req.URL.Path
@@ -143,7 +149,7 @@ func newProxyHandler(config *Config) (*ProxyHandler, error) {
 				}
 
 				if handler.enableLogs {
-					log.Printf("[请求转发] 将 URL 从 %s 重写为 %s", originalURL, req.URL.String())
+					log.Printf("[请求转发] 将 URL 从 %s 重写为 %s (原路径: %s)", originalURL, req.URL.String(), originalPath)
 				}
 			},
 			// ErrorHandler 在转发请求出错时调用
@@ -223,26 +229,22 @@ func main() {
 		log.Fatalf("日志初始化失败: %v", err)
 	}
 	defer logFile.Close()
-
 	// 从配置文件中加载配置
 	config, err := loadConfig(configPath)
 	if err != nil {
 		log.Fatalf("加载配置失败: %v", err)
 	}
-
 	// 创建反向代理处理器
 	proxyHandler, err := newProxyHandler(config)
 	if err != nil {
 		log.Fatalf("创建代理处理器失败: %v", err)
 	}
-
 	// 设置管理界面的静态文件服务，从嵌入的静态文件中获取
 	contentFS, err := fs.Sub(staticFiles, "static")
 	if err != nil {
 		log.Fatalf("获取嵌入静态文件子目录失败: %v", err)
 	}
 	adminFileServer := http.FileServer(http.FS(contentFS))
-
 	// 配置 HTTP 路由
 	mux := http.NewServeMux()
 	// 提供管理界面
@@ -290,7 +292,6 @@ func main() {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
 	})
-
 	// 启动管理界面服务器，监听 8080 端口
 	adminServer := &http.Server{
 		Addr:         ":39456",
@@ -299,7 +300,6 @@ func main() {
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  120 * time.Second,
 	}
-
 	// 启动代理服务器，监听配置文件中指定的地址
 	proxyServer := &http.Server{
 		Addr:         config.ListenAddr,
@@ -308,7 +308,6 @@ func main() {
 		WriteTimeout: time.Duration(config.Timeout.WriteTimeout) * time.Second,
 		IdleTimeout:  time.Duration(config.Timeout.IdleTimeout) * time.Second,
 	}
-
 	// 后台启动管理服务器
 	go func() {
 		log.Printf("管理服务器启动于 http://localhost:39456")
@@ -316,7 +315,6 @@ func main() {
 			log.Fatalf("管理服务器错误: %v", err)
 		}
 	}()
-
 	log.Printf("代理服务器启动于 %s", config.ListenAddr)
 	if err := proxyServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("代理服务器错误: %v", err)
